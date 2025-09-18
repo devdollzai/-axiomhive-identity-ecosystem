@@ -1,0 +1,13 @@
+repos:
+-   repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+    - id: flake8
+      args: [--max-line-length=88]
+
+-   repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v8.44.0
+    hooks:
+    - id: eslint
+      files: \.(js|jsx|ts|tsx|json|css|scss|md|mdx)$
+      args: [--fix]

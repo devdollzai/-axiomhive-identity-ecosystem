@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "axiomhive-identity-ecosystem"
+version = "1.0.0"
+description = "AXIOMHIVE Sovereign Identity Protocol"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "prometheus-client",
+    "requests",
+    "numpy",
+    "graphviz",
+    "httpx",
+    "Flask",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "flake8",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
