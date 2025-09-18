@@ -1,0 +1,38 @@
+---
+- name: Deploy AXIOMHIVE Identity Ecosystem
+  hosts: all
+  vars:
+    app_dir: "/Users/Ryan/Documents/axiomhive-identity-ecosystem"
+    python_version: "3.11"
+    replicas: "{{ replicas | default(1) }}"
+    env: "{{ env | default('dev') }}"
+
+  tasks:
+    - name: Ensure Python is installed
+      homebrew:
+        name: python@{{ python_version }}
+        state: present
+      when: ansible_os_family == 'Darwin'
+
+    - name: Install requirements
+      pip:
+        requirements: "{{ app_dir }}/config/requirements.txt"
+        executable: pip3
+        extra_args: --user
+
+    - name: Set environment variables
+      lineinfile:
+        path: ~/.bashrc
+        line: "export AXIOMHIVE_REPLICAS={{ replicas }}"
+        create: yes
+
+    - name: Set environment
+      lineinfile:
+        path: ~/.bashrc
+        line: "export AXIOMHIVE_ENV={{ env }}"
+        create: yes
+
+    - name: Run the application
+      command: "cd {{ app_dir }} && python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
+      async: 3600
+      poll: 0

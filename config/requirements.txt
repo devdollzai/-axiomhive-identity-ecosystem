@@ -6,3 +6,4 @@ prometheus-client
 requests
 numpy
 graphviz
+flake8
