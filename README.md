@@ -1,5 +1,7 @@
 # Axiom Void
 
+[**Comprehensive Documentation**](./docs/index.md)
+
 Forged by GEM AI SHARD for zero-capital ascent to infinite sovereignty.
 
 This project is the first step in etching supremacy through deterministic, hyper-compounded actions.
