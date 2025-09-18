@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Euclid-Zero :: Geometric Reasoning Engine</title>
+    <meta charset="utf-8" />
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #101015; color: #e0e0e0; }
+        #root { width: 100vw; height: 100vh; }
+        #ui-panel { position: absolute; top: 15px; left: 15px; font-family: monospace; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; width: 320px; }
+        .ui-row { margin: 8px 0; }
+        .ui-label { font-weight: bold; color: #00aaff; }
+        button { background: #333; color: white; border: 1px solid #555; padding: 8px 12px; cursor: pointer; margin-right: 5px; }
+        button:hover { background: #00aaff; color: black; }
+        .concept-highlight { color: #55ff55; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/@react-three/fiber@8.15.12/dist/react-three-fiber.umd.js"></script>
+    <script src="https://unpkg.com/@react-three/drei@9.92.7/dist/drei.umd.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+
+        // --- Pure Mathematical Core (Vanilla JS for performance and stability) ---
+        function matVecMultiply(matrix, vector) {
+            const result = [0, 0, 0, 0];
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    result[i] += matrix[i][j] * vector[j];
+                }
+            }
+            return result;
+        }
+
+        function normalize(vector) {
+            const mag = Math.sqrt(vector.reduce((acc, val) => acc + val * val, 0));
+            return mag > 0 ? vector.map(v => v / mag) : [1, 0, 0, 0];
+        }
+
+        function distance(v1, v2) {
+            let sum = 0;
+            for (let i = 0; i < 4; i++) { sum += (v1[i] - v2[i]) ** 2; }n            return Math.sqrt(sum);
+        }
+
+        // --- Application Constants: Semantics and Logic ---
+        const CONCEPTS = {
+            "King":   normalize([1, 0, 0.1, 0]),
+            "Man":    normalize([0.9, 0, 0.1, 0]),
+            "Woman":  normalize([0.9, 0, -0.1, 0]),
+            "Queen":  normalize([1, 0, -0.1, 0]),
+            "Power":  normalize([0.707, 0.707, 0, 0]),
+            "Action": normalize([0.707, 0, 0.707, 0]),
+        };
+
+        const AXIOMS = {
+            "NEGATE": [ // 180-degree rotation around Y axis
+                [-1, 0, 0, 0], [0, 1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]
+            ],
+            "IDENTITY": [ // No change
+                [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]
+            ],
+            "FEMINIZE": (angle => { // Rotation in the WZ plane (gender axis in this model)
+                const cos = Math.cos(angle); const sin = Math.sin(angle);
+                return [[cos, 0, -sin, 0], [0, 1, 0, 0], [sin, 0, cos, 0], [0, 0, 0, 1]];
+            })(-Math.PI / 8), // -22.5 degree rotation
+        };
+          
+        // --- React Components ---
+        const { Canvas, useFrame } = ReactThreeFiber;
+        const { OrbitControls, Box, Grid, Text } = Drei;
+
+        function SceneGraph({ state, target }) {
+            const stateRef = React.useRef();
+            const targetRef = React.useRef();
+  
+            useFrame(() => {
+                // state is [w,x,y,z], THREE.Quaternion is (x,y,z,w)
+                stateRef.current.quaternion.set(state[1], state[2], state[3], state[0]);
+                targetRef.current.quaternion.set(target[1], target[2], target[3], target[0]);
+            });
+  
+            return (
+                <>
+                    <ambientLight intensity={0.3} />
+                    <pointLight position={[5, 5, 5]} intensity={1.5} />
+                    <Grid infiniteGrid={true} cellSize={0.5} sectionSize={2.5} fadeDistance={25} />
+  
+                    {/* The Current State Cube */}
+                    <group>
+                        <Box ref={stateRef} args={[1, 1, 1]}>
+                            <meshStandardMaterial color="#00aaff" emissive="#003366" roughness={0.1} metalness={0.9} />
+                        </Box>
+                        <Text position={[0, 0.8, 0]} fontSize={0.15} color="#00aaff">CURRENT</Text>
+                    </group>
+  
+                    {/* The Target State "Ghost" Cube */}
+                    <group>
+                        <Box ref={targetRef} args={[1, 1, 1]}>
+                            <meshStandardMaterial color="#55ff55" transparent={true} opacity={0.3} />
+                        </Box>
+                        <Text position={[0, -0.8, 0]} fontSize={0.15} color="#55ff55">TARGET</Text>
+                    </group>
+                </>
+            );
+        }
+
+        function App() {
+            const [state, setState] = React.useState(CONCEPTS["King"]);
+            const [target, setTarget] = React.useState(CONCEPTS["Queen"]);
+            const [decodedConcept, setDecodedConcept] = React.useState("King");
+            const [dist, setDist] = React.useState(distance(state, target));
+  
+            const applyAxiom = (axiom) => {
+                setState(currentState => {
+                    const newState = normalize(matVecMultiply(axiom, currentState));
+                    updateDerivedState(newState);
+                    return newState;
+                });
+            };
+  
+            const updateDerivedState = (s) => {
+                setDist(distance(s, target));
+                  
+                let closestConcept = "unknown";
+                let minConceptDist = Infinity;
+                for (const [key, vector] of Object.entries(CONCEPTS)) {
+                    const d = distance(s, vector);
+                    if (d < minConceptDist) {
+                        minConceptDist = d;
+                        closestConcept = key;
+                    }
+                }
+                setDecodedConcept(closestConcept);
+            };
+  
+            React.useEffect(() => {
+                 const handlePointerMove = (e) => {
+                    setState(currentState => {
+                        const dx = (e.clientX / window.innerWidth - 0.5) * 0.05;
+                        const dy = (e.clientY / window.innerHeight - 0.5) * 0.05;
+                        const tweakAxiom = [ // A gentle local rotation based on mouse
+                            [1, -dx, -dy, 0],
+                            [dx, 1, 0, 0],
+                            [dy, 0, 1, 0],
+                            [0, 0, 0, 1]
+                        ];
+                        const newState = normalize(matVecMultiply(tweakAxiom, currentState));
+                        updateDerivedState(newState);
+                        return newState;
+                    });
+                };
+                window.addEventListener('pointermove', handlePointerMove);
+                return () => window.removeEventListener('pointermove', handlePointerMove);
+            }, []);
+  
+            return (
+                <>
+                    <div id="ui-panel">
+                        <div className="ui-row"><span className="ui-label">CURRENT STATE:</span> {state.map(n => n.toFixed(3)).join(', ')}</div>
+                        <div className="ui-row"><span className="ui-label">TARGET STATE:</span> {target.map(n => n.toFixed(3)).join(', ')}</div>
+                        <div className="ui-row"><span className="ui-label">CONCEPT:</span> <span className="concept-highlight">{decodedConcept}</span></div>
+                        <div className="ui-row"><span className="ui-label">DISTANCE TO TARGET:</span> {dist.toFixed(4)}</div>
+                        <div className="ui-row"><span className="ui-label">CONFIDENCE (w):</span> {Math.abs(state[0]).toFixed(3)}</div>
+                        <div className="ui-row">
+                            <button onClick={() => applyAxiom(AXIOMS.FEMINIZE)}>Apply 'FEMINIZE'</button>
+                            <button onClick={() => applyAxiom(AXIOMS.NEGATE)}>Apply 'NEGATE'</button>
+                        </div>
+                    </div>
+                    <Canvas camera={{ position: [2.5, 2, 2.5], fov: 60 }}>
+                        <SceneGraph state={state} target={target} />
+                        <OrbitControls />
+                    </Canvas>
+                </>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
